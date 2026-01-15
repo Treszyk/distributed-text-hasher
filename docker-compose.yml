@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  redis:
+    image: redis:alpine
+    restart: always
+
+  api:
+    build: ./api
+    restart: always
+    environment:
+      - REDIS_HOST=redis
+      - PORT=3000
+    depends_on:
+      - redis
+
+  worker:
+    build: ./worker
+    restart: always
+    environment:
+      - REDIS_HOST=redis
+      - SIMULATED_DELAY_MS=2000
+    depends_on:
+      - redis
+
+  autoscaler:
+    build: ./autoscaler
+    restart: always
+    environment:
+      - REDIS_HOST=redis
+      - COMPOSE_PROJECT_NAME=distributed-text-hasher
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/project
+    depends_on:
+      - redis
+
+volumes:
+  caddy_data:
+  caddy_config:

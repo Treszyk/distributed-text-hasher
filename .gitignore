@@ -1,0 +1,97 @@
+# =========================
+# Node / Package managers
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Lockfiles are usually COMMITTED (choose policy yourself)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# =========================
+# Build outputs
+# =========================
+dist/
+build/
+out/
+coverage/
+.tmp/
+.cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# =========================
+# Env / secrets
+# =========================
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# Runtime data
+# =========================
+pids/
+*.pid
+*.pid.lock
+
+# =========================
+# OS / Editor junk
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Next.js / Nuxt / SvelteKit
+# =========================
+.next/
+.nuxt/
+.svelte-kit/
+
+# =========================
+# Vite / Parcel / Webpack
+# =========================
+.vite/
+.parcel-cache/
+
+# =========================
+# Serverless / Cloud
+# =========================
+.vercel/
+.netlify/
+
+# =========================
+# Testing
+# =========================
+.nyc_output/
+coverage/
+
+# =========================
+# Misc
+# =========================
+*.tgz
+*.pem
+*.key
