@@ -4,9 +4,12 @@ Projekt zaliczeniowy z przedmiotu **Programowanie współbieżne i rozproszone**
 
 ## Cel projektu
 
-Celem projektu było stworzenie systemu, który demonstruje działanie przetwarzania rozproszonego na przykładzie generowania hashy SHA-256. Aplikacja symuluje "ciężkie" zadania obliczeniowe (fake delay), które są kolejkowane i przetwarzane równolegle przez dynamicznie skalowalną grupę workerów.
+Celem projektu jest stworzenie wysokowydajnego, rozproszonego systemu do **masowego haszowania danych tekstowych** przy użyciu algorytmu **Bcrypt**.
 
-Głównym założeniem było pokazanie, jak rozdzielenie warstwy zlecającej (API) od wykonawczej (Workers) pozwala na łatwe skalowanie poziome w zależności od aktualnego obciążenia systemu (autoscaling).
+System rozwiązuje problem **jak przetworzyć wiele kosztownych obliczeniowo operacji kryptograficznych w rozsądnym czasie?**
+Algorytm `Bcrypt` jest celowo powolny (CPU-intensive), aby utrudnić ataki typu brute-force. Przetwarzanie tysięcy haseł na pojedynczej maszynie trwałoby godziny. Zastosowanie architektury rozproszonej pozwala na zrównoleglenie tego procesu na dziesiątki kontenerów, skracając czas realizacji liniowo wraz z dodawaniem zasobów.
+
+Projekt demonstruje praktyczne zastosowanie autoskalowania w odpowiedzi na realne obciążenie procesora (CPU-bound tasks).
 
 ## Zastosowane rozwiązania
 
@@ -14,9 +17,10 @@ W projekcie wykorzystano architekturę mikroserwisów opartą o kontenery Docker
 
 - **Node.js & TypeScript**: Język implementacji wszystkich serwisów.
 - **Redis**: Pełni rolę brokera wiadomości (kolejki zadań) oraz współdzielonej pamięci stanu (stan workerów, wyniki obliczeń).
-- **Wzorzec Master-Worker (Queue-based load leveling)**: API nie przetwarza danych, a jedynie wrzuca je na kolejkę. Workery (konsumenci) pobierają zadania w swoim tempie.
+- **Wzorzec Master-Worker**: API nie przetwarza danych, a jedynie wrzuca je do kolejkę. Workery (konsumenci) pobierają zadania w swoim tempie.
 - **Równoległość**: Każdy kontener workera działa jako niezależny proces. Uruchomienie wielu kontenerów pozwala na równoległe przetwarzanie wielu haseł jednocześnie.
 - **Autoskalowanie**: Dedykowany serwis monitoruje długość kolejki w Redis i automatycznie zarządza liczbą aktywnych kontenerów (poprzez Docker API), zwiększając ich liczbę przy dużym obciążeniu (np. wgranie pliku tekstowego) i zmniejszając, gdy kolejka jest pusta.
+- **Odporność na awarie**: System implementuje mechanizm retry. Jeśli worker ulegnie awarii (crash) podczas przetwarzania, opuszczone zadanie jest wykrywane i przywracane do kolejki.
 
 ## Sposób uruchomienia
 

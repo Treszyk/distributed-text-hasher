@@ -26,10 +26,17 @@ app.post('/jobs/text', async (req: Request, res: Response) => {
 			return res.status(400).json({ error: 'Text is required' });
 		}
 
-		if (algorithm !== 'sha256') {
+		if (algorithm !== 'sha256' && algorithm !== 'bcrypt') {
 			return res
 				.status(400)
-				.json({ error: 'Only sha256 algorithm is supported currently' });
+				.json({ error: 'Only sha256 and bcrypt algorithms are supported' });
+		}
+
+		const queueLength = await redisClient.lLen(QUEUE_NAME);
+		if (queueLength >= 5000) {
+			return res
+				.status(429)
+				.json({ error: 'System overloaded. Please try again later.' });
 		}
 
 		const jobId = uuidv4();
@@ -44,6 +51,7 @@ app.post('/jobs/text', async (req: Request, res: Response) => {
 		await redisClient.hSet(`job:${jobId}`, {
 			status: 'queued',
 			algorithm,
+			text,
 			createdAt: jobData.createdAt,
 		});
 
@@ -83,6 +91,8 @@ app.post('/jobs/batch', async (req: Request, res: Response) => {
 				workerId: job.workerId,
 				hash: job.hash,
 				text: job.text,
+				error: job.error,
+				retries: job.retries,
 			};
 		});
 
@@ -119,6 +129,7 @@ app.get('/jobs/:jobId', async (req: Request, res: Response) => {
 				jobId,
 				status: job.status,
 				workerId: job.workerId,
+				retries: job.retries,
 			});
 		}
 

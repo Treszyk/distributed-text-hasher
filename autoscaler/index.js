@@ -3,8 +3,8 @@ const { exec } = require('child_process');
 
 const REDIS_HOST = process.env.REDIS_HOST || 'redis';
 const QUEUE_NAME = 'queue:jobs';
-const MIN_WORKERS = 1;
-const MAX_WORKERS = 10;
+const MIN_WORKERS = parseInt(process.env.MIN_WORKERS || '1', 10);
+const MAX_WORKERS = parseInt(process.env.MAX_WORKERS || '10', 10);
 const CHECK_INTERVAL = 500;
 
 let currentWorkers = 1;
@@ -36,7 +36,7 @@ const scaleWorkers = (count) => {
 
 		console.log(`Scaling workers to ${count}...`);
 		exec(
-			`docker compose up -d --scale worker=${count} --no-recreate`,
+			`docker compose up -d --scale worker=${count} --no-recreate worker`,
 			{ cwd: '/project' },
 			(error, stdout, stderr) => {
 				isScaling = false;
@@ -100,6 +100,75 @@ const main = async () => {
 	console.log('Autoscaler started. Monitoring queue...');
 
 	setInterval(checkQueue, CHECK_INTERVAL);
+	setInterval(cleanupStaleJobs, 10000);
+};
+
+const cleanupStaleJobs = async () => {
+	try {
+		const workerKeys = await redisClient.keys('worker:heartbeat:*');
+		const activeWorkerIds = new Set(workerKeys.map((k) => k.split(':').pop()));
+
+		const jobKeys = await redisClient.keys('job:*');
+
+		for (const key of jobKeys) {
+			const job = await redisClient.hGetAll(key);
+
+			if (job.status === 'processing' && job.workerId) {
+				if (!activeWorkerIds.has(job.workerId)) {
+					const retries = parseInt(job.retries || '0', 10);
+
+					if (retries < 3) {
+						if (!job.text) {
+							console.log(
+								`Found stale job ${job.jobId} (worker ${job.workerId} dead). Missing 'text' - cannot retry.`
+							);
+							await redisClient.hSet(key, {
+								status: 'failed',
+								error: 'Worker crashed (Data lost - cannot retry)',
+								finishedAt: new Date().toISOString(),
+							});
+							continue;
+						}
+
+						console.log(
+							`Found stale job ${job.jobId} (worker ${
+								job.workerId
+							} dead). Retrying (${retries + 1}/3)...`
+						);
+
+						await redisClient.hSet(key, {
+							status: 'queued',
+							workerId: '',
+							retries: retries + 1,
+							updatedAt: new Date().toISOString(),
+						});
+
+						const jobId = key.split(':')[1];
+						const jobData = {
+							jobId: jobId,
+							text: job.text,
+							algorithm: job.algorithm || 'sha256',
+							status: 'queued',
+							retries: retries + 1,
+						};
+
+						await redisClient.lPush('queue:jobs', JSON.stringify(jobData));
+					} else {
+						console.log(
+							`Found stale job ${job.jobId} (worker ${job.workerId} dead). Max retries reached. Marking failed.`
+						);
+						await redisClient.hSet(key, {
+							status: 'failed',
+							error: 'Worker crashed (Max retries exceeded)',
+							finishedAt: new Date().toISOString(),
+						});
+					}
+				}
+			}
+		}
+	} catch (e) {
+		console.error('Error in janitor:', e);
+	}
 };
 
 main();

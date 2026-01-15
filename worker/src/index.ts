@@ -1,5 +1,6 @@
 import { createClient, commandOptions } from 'redis';
 import crypto from 'crypto';
+import * as bcrypt from 'bcryptjs';
 import os from 'os';
 
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
@@ -36,6 +37,10 @@ const processJob = async (jobDataStr: string) => {
 		const { jobId, text, algorithm } = job;
 		console.log(`${WORKER_ID}: Processing job ${jobId}`);
 
+		if (!text) {
+			throw new Error('Missing "text" property in job data');
+		}
+
 		await redisClient.hSet(`job:${jobId}`, {
 			status: 'processing',
 			workerId: WORKER_ID,
@@ -46,9 +51,13 @@ const processJob = async (jobDataStr: string) => {
 			await new Promise((resolve) => setTimeout(resolve, SIMULATED_DELAY_MS));
 		}
 
+		console.log(`${WORKER_ID}: Hashing with algorithm: ${algorithm}`);
+
 		let hashResult = '';
 		if (algorithm === 'sha256') {
 			hashResult = crypto.createHash('sha256').update(text).digest('hex');
+		} else if (algorithm === 'bcrypt') {
+			hashResult = await bcrypt.hash(text, 14);
 		} else {
 			throw new Error(`Unsupported algorithm: ${algorithm}`);
 		}
@@ -83,10 +92,12 @@ const main = async () => {
 
 	console.log(`Worker ${WORKER_ID} started, waiting for jobs...`);
 
+	await sendHeartbeat();
 	setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 
 	let isProcessing = false;
 	let currentJobId: string | null = null;
+	let currentJobData: string | null = null;
 	let isShuttingDown = false;
 
 	const shutdown = async () => {
@@ -96,16 +107,26 @@ const main = async () => {
 
 		if (isProcessing && currentJobId) {
 			console.log(
-				`${WORKER_ID}: Marking job ${currentJobId} as failed due to shutdown`
+				`${WORKER_ID}: Re-queuing job ${currentJobId} due to shutdown`
 			);
 			try {
 				await redisClient.hSet(`job:${currentJobId}`, {
-					status: 'failed',
-					error: 'Worker shutting down',
-					finishedAt: new Date().toISOString(),
+					status: 'queued',
+					workerId: '',
+					updatedAt: new Date().toISOString(),
 				});
+
+				if (currentJobData) {
+					await redisClient.lPush('queue:jobs', currentJobData);
+				} else {
+					await redisClient.hSet(`job:${currentJobId}`, {
+						status: 'failed',
+						error: 'Worker shutdown (Data lost)',
+						finishedAt: new Date().toISOString(),
+					});
+				}
 			} catch (e) {
-				console.error('Error marking job failed during shutdown', e);
+				console.error('Error re-queuing job during shutdown', e);
 			}
 		}
 
@@ -130,16 +151,20 @@ const main = async () => {
 				0
 			);
 
-			if (isShuttingDown) break;
-
 			if (result) {
 				isProcessing = true;
 				const job = JSON.parse(result.element);
 				currentJobId = job.jobId;
+				currentJobData = result.element;
+
 				await processJob(result.element);
+
 				isProcessing = false;
 				currentJobId = null;
+				currentJobData = null;
 			}
+
+			if (isShuttingDown) break;
 		} catch (error) {
 			if (isShuttingDown) break;
 			console.error('Error in worker loop:', error);

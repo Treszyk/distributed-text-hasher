@@ -7,10 +7,12 @@
 		"build": "tsc"
 	},
 	"dependencies": {
-		"redis": "^4.6.10"
+		"redis": "^4.6.10",
+		"bcryptjs": "^2.4.3"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.5",
+		"@types/bcryptjs": "^2.4.6",
 		"ts-node": "^10.9.2",
 		"typescript": "^5.3.3"
 	}
