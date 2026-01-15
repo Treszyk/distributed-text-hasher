@@ -53,6 +53,9 @@ const scaleWorkers = (count) => {
 	});
 };
 
+const SCALE_DOWN_COOLDOWN_MS = 5000;
+let lastQueueActivity = Date.now();
+
 const checkQueue = async () => {
 	try {
 		const scalingEnabled = await redisClient.get('config:autoscaling');
@@ -62,33 +65,46 @@ const checkQueue = async () => {
 		}
 
 		const queueLength = await redisClient.lLen(QUEUE_NAME);
-
 		const activeWorkers = await getActiveWorkers();
+
 		if (!isScaling) {
 			currentWorkers = activeWorkers;
 		}
 
 		console.log(`Queue: ${queueLength}, Workers: ${currentWorkers}`);
 
-		let desiredWorkers = currentWorkers;
+		if (queueLength > 0) {
+			lastQueueActivity = Date.now();
+		}
 
 		if (queueLength > 0) {
-			desiredWorkers = Math.min(Math.ceil(queueLength / 2), MAX_WORKERS);
+			const desiredWorkers = Math.min(Math.ceil(queueLength / 2), MAX_WORKERS);
 
 			if (desiredWorkers > currentWorkers) {
 				await setScalerStatus('scaling_up');
 				await scaleWorkers(desiredWorkers);
-			} else if (desiredWorkers < currentWorkers && queueLength === 0) {
-				await setScalerStatus('scaling_down');
-				await scaleWorkers(desiredWorkers);
 			} else {
 				await setScalerStatus('idle');
 			}
-		} else if (currentWorkers > MIN_WORKERS) {
-			await setScalerStatus('scaling_down');
-			await scaleWorkers(MIN_WORKERS);
 		} else {
-			await setScalerStatus('idle');
+			const timeSinceActivity = Date.now() - lastQueueActivity;
+
+			if (currentWorkers > MIN_WORKERS) {
+				if (timeSinceActivity > SCALE_DOWN_COOLDOWN_MS) {
+					console.log(
+						`Queue empty for ${timeSinceActivity}ms. Scaling down...`
+					);
+					await setScalerStatus('scaling_down');
+					await scaleWorkers(MIN_WORKERS);
+				} else {
+					console.log(
+						`Queue empty, but waiting for cooldown (${timeSinceActivity}/${SCALE_DOWN_COOLDOWN_MS}ms)`
+					);
+					await setScalerStatus('idle_cooldown');
+				}
+			} else {
+				await setScalerStatus('idle');
+			}
 		}
 	} catch (error) {
 		console.error('Error checking queue:', error);
