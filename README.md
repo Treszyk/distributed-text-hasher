@@ -33,4 +33,4 @@ Wymagany jest **Docker Desktop**.
 2.  Tworzenie zadań i podgląd statusu dostępne są w przeglądarce pod adresem:
     [http://localhost](http://localhost)
 
-Aplikacja umożliwia wpisywanie pojedynczych fraz, generowanie sztucznego ruchu ("Flood") oraz wgranie pliku `.txt` i wyeksportowanie wyników. System wizualizuje status zadań (Queued -> Processing -> Done) oraz wyświetla aktualną liczbę workerów.
+Aplikacja umożliwia wpisywanie pojedynczych fraz, generowanie sztucznego ruchu ("Flood") oraz wgranie pliku `.txt` (każda linijka jest osobno hashowana) i wyeksportowanie wyników. System wizualizuje status zadań (Queued -> Processing -> Done) oraz wyświetla aktualną liczbę workerów.
