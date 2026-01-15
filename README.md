@@ -17,7 +17,7 @@ W projekcie wykorzystano architekturę mikroserwisów opartą o kontenery Docker
 
 - **Node.js & TypeScript**: Język implementacji wszystkich serwisów.
 - **Redis**: Pełni rolę brokera wiadomości (kolejki zadań) oraz współdzielonej pamięci stanu (stan workerów, wyniki obliczeń).
-- **Wzorzec Master-Worker**: API nie przetwarza danych, a jedynie wrzuca je do kolejkę. Workery (konsumenci) pobierają zadania w swoim tempie.
+- **Wzorzec Master-Worker**: API nie przetwarza danych, a jedynie wrzuca je do kolejki. Workery (konsumenci) pobierają zadania w swoim tempie.
 - **Równoległość**: Każdy kontener workera działa jako niezależny proces. Uruchomienie wielu kontenerów pozwala na równoległe przetwarzanie wielu haseł jednocześnie.
 - **Autoskalowanie**: Dedykowany serwis monitoruje długość kolejki w Redis i automatycznie zarządza liczbą aktywnych kontenerów (poprzez Docker API), zwiększając ich liczbę przy dużym obciążeniu (np. wgranie pliku tekstowego) i zmniejszając, gdy kolejka jest pusta.
 - **Odporność na awarie**: System implementuje mechanizm retry. Jeśli worker ulegnie awarii (crash) podczas przetwarzania, opuszczone zadanie jest wykrywane i przywracane do kolejki.
@@ -33,4 +33,4 @@ Wymagany jest **Docker Desktop**.
 2.  Tworzenie zadań i podgląd statusu dostępne są w przeglądarce pod adresem:
     [http://localhost](http://localhost)
 
-Aplikacja umożliwia wpisywanie pojedynczych fraz, generowanie sztucznego ruchu ("Flood") oraz wgranie pliku `.txt` i wyeksportowanie wyników. System wizualizuje status zadań (Queued -> Processing -> Done) oraz wyświetla aktualną liczbę workerów.
+Aplikacja umożliwia wpisywanie pojedynczych fraz, generowanie sztucznego ruchu ("Flood") oraz wgranie pliku `.txt` (każda linijka jest osobno hashowana) i wyeksportowanie wyników. System wizualizuje status zadań (Queued -> Processing -> Done) oraz wyświetla aktualną liczbę workerów.
